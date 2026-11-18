@@ -36,6 +36,16 @@
 .rail-right { border-left: 0; }
 .topbar { border-bottom: 0; }
 
+/* 站内页面切换时保留当前画面，模糊背景并显示主题色加载环 */
+.page-transition { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 68%, transparent); backdrop-filter: blur(10px); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .18s ease, visibility .18s ease; }
+.page-transition.is-loading { opacity: 1; visibility: visible; pointer-events: auto; }
+.page-transition-spinner { width: 54px; height: 54px; border: 4px solid color-mix(in srgb, var(--primary) 25%, transparent); border-top-color: var(--primary); border-radius: 50%; animation: page-loading-spin .7s linear infinite; }
+@keyframes page-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .page-transition { transition: none; }
+  .page-transition-spinner { animation: none; }
+}
+
 /* 右侧阅读日历 */
 .rail-right:hover,
 .rail-right:focus-within { width: 350px; }
@@ -140,3 +150,23 @@ body.reading-day-open { overflow: hidden; }
   .reading-day-main { grid-template-columns: 1fr; grid-template-rows: minmax(0,1fr) auto; }
   .reading-day-editor { max-height: 39vh; padding: 12px; }
 }
+
+/* 浅色模式下，紫色卡片与选中控件统一使用白色前景 */
+:root[data-theme='light'] {
+  --card: #8060ad;
+  --card-text: #fff;
+}
+:root[data-theme='light'] .post-card :is(p, .post-meta),
+:root[data-theme='light'] .article-row :is(p, time),
+:root[data-theme='light'] .post-pager small { opacity: 1; }
+:root[data-theme='light'] .category-tag { background: #6e519f; color: #fff; }
+:root[data-theme='light'] .nav-item.active,
+:root[data-theme='light'] .nav-item:hover,
+:root[data-theme='light'] .calendar-days button.selected,
+:root[data-theme='light'] .calendar-event:hover,
+:root[data-theme='light'] .calendar-add,
+:root[data-theme='light'] .calendar-connect,
+:root[data-theme='light'] .reading-day-event:hover,
+:root[data-theme='light'] .reading-day-all-day-event,
+:root[data-theme='light'] .reading-day-actions > .reading-day-add,
+:root[data-theme='light'] .reading-day-actions > .reading-day-connect { color: #fff; }

@@ -3,6 +3,7 @@ import type { Post } from '../lib/posts';
 import { categories, urlForCategory } from '../lib/posts';
 import { profile } from '../site.config';
 import ReadingCalendar from '../components/ReadingCalendar.astro';
+import { ClientRouter } from 'astro:transitions';
 import '../styles/global.css';
 import '../styles/custom.css';
 
@@ -26,9 +27,30 @@ const currentPath = Astro.url.pathname;
     <meta name="description" content={description} />
     <meta name="theme-color" content="#141316" />
     <title>{title === '博客' ? title : `${title} · 博客`}</title>
+    <ClientRouter />
+    <script is:inline>
+      try { document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark'; }
+      catch { document.documentElement.dataset.theme = 'dark'; }
+      if (!window.__blogTransitionReady) {
+        window.__blogTransitionReady = true;
+        document.addEventListener('astro:before-preparation', () => {
+          document.querySelector('#page-transition')?.classList.add('is-loading');
+        });
+        document.addEventListener('astro:before-swap', (event) => {
+          event.newDocument.documentElement.dataset.theme = document.documentElement.dataset.theme;
+        });
+        document.addEventListener('astro:page-load', () => {
+          const overlay = document.querySelector('#page-transition');
+          if (overlay?.classList.contains('is-loading')) {
+            setTimeout(() => overlay.classList.remove('is-loading'), 120);
+          }
+        });
+      }
+    </script>
   </head>
   <body>
     <a class="skip-link" href="#main">跳转到正文</a>
+    <div class="page-transition" id="page-transition" transition:persist role="status" aria-label="页面加载中"><span class="page-transition-spinner" aria-hidden="true"></span></div>
     <div class="app-shell">
       <div class="mobile-backdrop" data-close-drawers></div>
       <aside class="rail rail-left" id="left-drawer" aria-label="网站导航">
@@ -65,8 +87,10 @@ const currentPath = Astro.url.pathname;
       </aside>
     </div>
     <script>
+      document.addEventListener('astro:page-load', () => {
+      const controller = new AbortController();
+      document.addEventListener('astro:before-swap', () => controller.abort(), { once: true });
       const root = document.documentElement;
-      try { root.dataset.theme = localStorage.getItem('theme') || 'dark'; } catch { root.dataset.theme = 'dark'; }
       document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
         const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
         root.dataset.theme = next;
@@ -78,7 +102,7 @@ const currentPath = Astro.url.pathname;
       };
       document.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((button) => button.addEventListener('click', () => setDrawer(root.dataset.drawer === button.dataset.open ? null : button.dataset.open || null)));
       document.querySelector('[data-close-drawers]')?.addEventListener('click', () => setDrawer(null));
-      document.addEventListener('keydown', (event) => { if (event.key === 'Escape') setDrawer(null); });
+      document.addEventListener('keydown', (event) => { if (event.key === 'Escape') setDrawer(null); }, { signal: controller.signal });
       document.querySelectorAll('.rail a').forEach((link) => link.addEventListener('click', () => setDrawer(null)));
       const updateProgress = () => {
         const scrollable = document.documentElement.scrollHeight - window.innerHeight;
@@ -90,9 +114,10 @@ const currentPath = Astro.url.pathname;
         if (label) label.textContent = `${percent}%`;
         track?.setAttribute('aria-valuenow', String(percent));
       };
-      window.addEventListener('scroll', updateProgress, { passive: true });
-      window.addEventListener('resize', updateProgress);
+      window.addEventListener('scroll', updateProgress, { passive: true, signal: controller.signal });
+      window.addEventListener('resize', updateProgress, { signal: controller.signal });
       updateProgress();
+      });
     </script>
   </body>
 </html>

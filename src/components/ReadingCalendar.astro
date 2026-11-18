@@ -58,8 +58,11 @@ const calendarId = import.meta.env.PUBLIC_GOOGLE_CALENDAR_ID || 'primary';
   };
   type TokenResponse = { access_token?: string; expires_in?: number; error?: string };
   type TokenClient = { requestAccessToken: (config?: { prompt?: string }) => void };
+  document.addEventListener('astro:page-load', () => {
   const widget = document.querySelector<HTMLElement>('#reading-calendar');
   if (widget) {
+    const controller = new AbortController();
+    document.addEventListener('astro:before-swap', () => controller.abort(), { once: true });
     const clientId = widget.dataset.clientId || '';
     const calendarId = widget.dataset.calendarId || 'primary';
     const connectButton = widget.querySelector<HTMLButtonElement>('[data-calendar-connect]')!;
@@ -398,7 +401,7 @@ const calendarId = import.meta.env.PUBLIC_GOOGLE_CALENDAR_ID || 'primary';
     dayRefresh.addEventListener('click', () => { void loadMonth(); });
     dayAdd.addEventListener('click', () => showDayEditor());
     allDayInput.addEventListener('change', updateTimeFields);
-    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !dayView.hidden) closeDay(); });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !dayView.hidden) closeDay(); }, { signal: controller.signal });
     addButton.addEventListener('click', () => openForm());
     widget.querySelector('[data-calendar-cancel]')?.addEventListener('click', () => { form.hidden = true; if (!dayView.hidden) renderDay(); });
 
@@ -441,7 +444,7 @@ const calendarId = import.meta.env.PUBLIC_GOOGLE_CALENDAR_ID || 'primary';
         await loadMonth();
       } catch (error) { setStatus(error instanceof Error ? error.message : '删除失败。'); }
     });
-    window.addEventListener('focus', () => { if (hasToken()) void loadMonth(); });
+    window.addEventListener('focus', () => { if (hasToken()) void loadMonth(); }, { signal: controller.signal });
     connectButton.disabled = true;
     setConnected(false);
     setStatus(clientId ? '加载 Google 授权服务…' : '请先配置 Google OAuth Client ID。');
@@ -474,4 +477,5 @@ const calendarId = import.meta.env.PUBLIC_GOOGLE_CALENDAR_ID || 'primary';
     }
     render();
   }
+  });
 </script>
