@@ -12,7 +12,6 @@
 }
 
 /* 浅色模式：淡紫色的选中项和按钮使用白色文字、图标 */
-:root[data-theme='light'] { --primary: #8564b0; }
 :root[data-theme='light'] :is(
   .nav-item.active,
   .nav-item:hover,
@@ -151,14 +150,7 @@ body.reading-day-open { overflow: hidden; }
   .reading-day-editor { max-height: 39vh; padding: 12px; }
 }
 
-/* 浅色模式下，紫色卡片与选中控件统一使用白色前景 */
-:root[data-theme='light'] {
-  --card: #8060ad;
-  --card-text: #fff;
-}
-:root[data-theme='light'] .post-card :is(p, .post-meta),
-:root[data-theme='light'] .article-row :is(p, time),
-:root[data-theme='light'] .post-pager small { opacity: 1; }
+/* 浅色模式下，紫色选中控件使用白色前景 */
 :root[data-theme='light'] .category-tag { background: #6e519f; color: #fff; }
 :root[data-theme='light'] .nav-item.active,
 :root[data-theme='light'] .nav-item:hover,

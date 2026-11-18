@@ -28,12 +28,15 @@ const currentPath = Astro.url.pathname;
     <meta name="theme-color" content="#141316" />
     <title>{title === '博客' ? title : `${title} · 博客`}</title>
     <ClientRouter />
+    <noscript><style>.page-transition { display: none; }</style></noscript>
     <script is:inline>
       try { document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark'; }
       catch { document.documentElement.dataset.theme = 'dark'; }
       if (!window.__blogTransitionReady) {
         window.__blogTransitionReady = true;
+        let clientNavigation = false;
         document.addEventListener('astro:before-preparation', () => {
+          clientNavigation = true;
           document.querySelector('#page-transition')?.classList.add('is-loading');
         });
         document.addEventListener('astro:before-swap', (event) => {
@@ -42,15 +45,16 @@ const currentPath = Astro.url.pathname;
         document.addEventListener('astro:page-load', () => {
           const overlay = document.querySelector('#page-transition');
           if (overlay?.classList.contains('is-loading')) {
-            setTimeout(() => overlay.classList.remove('is-loading'), 120);
+            setTimeout(() => overlay.classList.remove('is-loading'), clientNavigation ? 120 : 400);
           }
+          clientNavigation = false;
         });
       }
     </script>
   </head>
   <body>
     <a class="skip-link" href="#main">跳转到正文</a>
-    <div class="page-transition" id="page-transition" transition:persist role="status" aria-label="页面加载中"><span class="page-transition-spinner" aria-hidden="true"></span></div>
+    <div class="page-transition is-loading" id="page-transition" transition:persist role="status" aria-label="页面加载中"><span class="page-transition-spinner" aria-hidden="true"></span></div>
     <div class="app-shell">
       <div class="mobile-backdrop" data-close-drawers></div>
       <aside class="rail rail-left" id="left-drawer" aria-label="网站导航">
