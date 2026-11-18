@@ -1,0 +1,12 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import { allPosts, formatDate, urlForPost } from '../lib/posts';
+const posts = await allPosts();
+const base = import.meta.env.BASE_URL;
+---
+<SiteLayout title="博客" description="个人博客" posts={posts}>
+  <section class="content-section" id="articles">
+    <div class="section-heading"><h1>最新文章</h1><a class="count-pill" href={`${base}posts/`} aria-label={`查看全部 ${posts.length} 篇文章`}>{posts.length}</a></div>
+    {posts.length > 0 ? <div class="post-grid">{posts.slice(0, 4).map((post) => <a class="post-card" href={urlForPost(post, base)}><div class="post-card-top"><span class="category-tag">{post.data.category}</span><span class="material-symbols-outlined" aria-hidden="true">arrow_outward</span></div><h2>{post.data.title}</h2><p>{post.data.description}</p><div class="post-meta"><time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time></div></a>)}</div> : <div class="empty-state"><span class="material-symbols-outlined" aria-hidden="true">article</span><p>暂无文章</p></div>}
+  </section>
+</SiteLayout>

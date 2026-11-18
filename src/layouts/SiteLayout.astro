@@ -1,0 +1,98 @@
+---
+import type { Post } from '../lib/posts';
+import { categories, urlForCategory } from '../lib/posts';
+import { profile } from '../site.config';
+import ReadingCalendar from '../components/ReadingCalendar.astro';
+import '../styles/global.css';
+import '../styles/custom.css';
+
+interface Props {
+  title: string;
+  description: string;
+  posts: Post[];
+  activeCategory?: string;
+  toc?: { depth: number; slug: string; text: string }[];
+}
+
+const { title, description, posts, activeCategory, toc = [] } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const currentPath = Astro.url.pathname;
+---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#141316" />
+    <title>{title === '博客' ? title : `${title} · 博客`}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳转到正文</a>
+    <div class="app-shell">
+      <div class="mobile-backdrop" data-close-drawers></div>
+      <aside class="rail rail-left" id="left-drawer" aria-label="网站导航">
+        <div class="rail-inner">
+          <a class="rail-head" href={base} aria-label="博客首页"><span class="material-symbols-outlined" aria-hidden="true">article</span><strong class="rail-label">博客</strong></a>
+          {(profile.name || profile.bio || profile.avatar) && <div class="profile rail-label">{profile.avatar ? <img src={profile.avatar} alt="作者头像" /> : <span class="material-symbols-outlined" aria-hidden="true">account_circle</span>}<div>{profile.name && <strong>{profile.name}</strong>}{profile.bio && <p>{profile.bio}</p>}</div></div>}
+          <nav class="nav-list" aria-label="主要导航">
+            <a class:list={["nav-item", { active: currentPath === base }]} href={base} title="首页"><span class="material-symbols-outlined" aria-hidden="true">home</span><span class="rail-label">首页</span></a>
+            <a class:list={["nav-item", { active: currentPath.startsWith(`${base}posts/`) }]} href={`${base}posts/`} title="文章"><span class="material-symbols-outlined" aria-hidden="true">description</span><span class="rail-label">文章</span></a>
+            {categories(posts).map((category) => <a class:list={["nav-item", { active: activeCategory === category && currentPath.startsWith(`${base}category/`) }]} href={urlForCategory(category, base)} title={category}><span class="material-symbols-outlined" aria-hidden="true">folder</span><span class="rail-label">{category}</span></a>)}
+          </nav>
+          {toc.length > 0 && <div class="toc-wrap rail-label"><div class="rail-section-title">目录</div><nav aria-label="本文目录">{toc.map((item) => <a class:list={["toc-link", { nested: item.depth > 2 }]} href={`#${item.slug}`}>{item.text}</a>)}</nav></div>}
+        </div>
+      </aside>
+      <div class="main-column">
+        <header class="topbar">
+          <button class="icon-button mobile-menu" type="button" data-open="left" aria-label="打开导航" aria-controls="left-drawer" aria-expanded="false"><span class="material-symbols-outlined" aria-hidden="true">menu</span></button>
+          <a class="topbar-title" href={base}>博客</a>
+          <button class="icon-button mobile-tools" type="button" data-open="right" aria-label="打开阅读工具" aria-controls="right-drawer" aria-expanded="false"><span class="material-symbols-outlined" aria-hidden="true">tune</span></button>
+        </header>
+        <main id="main"><slot /></main>
+      </div>
+      <aside class="rail rail-right" id="right-drawer" aria-label="阅读工具">
+        <div class="rail-inner">
+          <div class="rail-head"><span class="material-symbols-outlined" aria-hidden="true">tune</span><strong class="rail-label">阅读工具</strong></div>
+          <ReadingCalendar />
+          <div class="right-tools rail-label">
+            <div class="progress-header"><span>阅读进度</span><span id="reading-percent">0%</span></div>
+            <div class="progress-track" role="progressbar" aria-label="阅读进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="reading-progress"></span></div>
+            <button class="tool-button" type="button" data-theme-toggle><span class="material-symbols-outlined" aria-hidden="true">contrast</span>切换主题</button>
+            <a class="tool-button" href="#main"><span class="material-symbols-outlined" aria-hidden="true">vertical_align_top</span>返回顶部</a>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <script>
+      const root = document.documentElement;
+      try { root.dataset.theme = localStorage.getItem('theme') || 'dark'; } catch { root.dataset.theme = 'dark'; }
+      document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
+        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        root.dataset.theme = next;
+        try { localStorage.setItem('theme', next); } catch {}
+      });
+      const setDrawer = (side: string | null) => {
+        root.dataset.drawer = side || '';
+        document.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((button) => button.setAttribute('aria-expanded', String(button.dataset.open === side)));
+      };
+      document.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((button) => button.addEventListener('click', () => setDrawer(root.dataset.drawer === button.dataset.open ? null : button.dataset.open || null)));
+      document.querySelector('[data-close-drawers]')?.addEventListener('click', () => setDrawer(null));
+      document.addEventListener('keydown', (event) => { if (event.key === 'Escape') setDrawer(null); });
+      document.querySelectorAll('.rail a').forEach((link) => link.addEventListener('click', () => setDrawer(null)));
+      const updateProgress = () => {
+        const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+        const percent = scrollable <= 0 ? 100 : Math.min(100, Math.round(window.scrollY / scrollable * 100));
+        const bar = document.querySelector<HTMLElement>('#reading-progress');
+        const label = document.querySelector('#reading-percent');
+        const track = document.querySelector('.progress-track');
+        if (bar) bar.style.width = `${percent}%`;
+        if (label) label.textContent = `${percent}%`;
+        track?.setAttribute('aria-valuenow', String(percent));
+      };
+      window.addEventListener('scroll', updateProgress, { passive: true });
+      window.addEventListener('resize', updateProgress);
+      updateProgress();
+    </script>
+  </body>
+</html>

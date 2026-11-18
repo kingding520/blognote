@@ -1,0 +1,477 @@
+---
+import { googleCalendarClientId } from '../calendar.config';
+const clientId = import.meta.env.PUBLIC_GOOGLE_CLIENT_ID || googleCalendarClientId;
+const calendarId = import.meta.env.PUBLIC_GOOGLE_CALENDAR_ID || 'primary';
+---
+<section class="reading-calendar rail-label" id="reading-calendar" data-client-id={clientId} data-calendar-id={calendarId} aria-label="阅读日历">
+  <div class="calendar-heading"><span class="material-symbols-outlined" aria-hidden="true">calendar_month</span><strong>阅读日历</strong></div>
+  <div class="calendar-auth"><button type="button" class="calendar-connect" data-calendar-connect>连接 Google 日历</button><button type="button" class="calendar-disconnect" data-calendar-disconnect hidden>断开</button></div>
+  <p class="calendar-status" data-calendar-status role="status" aria-live="polite"></p>
+  <div class="calendar-controls"><button type="button" data-calendar-prev aria-label="上个月"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></button><strong data-calendar-month></strong><button type="button" data-calendar-next aria-label="下个月"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button></div>
+  <div class="calendar-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+  <div class="calendar-days" data-calendar-days></div>
+  <div class="calendar-day-heading"><strong data-calendar-selected></strong><button type="button" data-calendar-refresh aria-label="同步日历" title="同步日历" hidden><span class="material-symbols-outlined" aria-hidden="true">sync</span></button></div>
+  <div class="calendar-events" data-calendar-events></div>
+  <button type="button" class="calendar-add" data-calendar-add hidden><span class="material-symbols-outlined" aria-hidden="true">add</span>添加活动</button>
+  <form class="calendar-form" data-calendar-form hidden>
+    <label>标题<input name="title" maxlength="100" required /></label>
+    <label>开始日期<input name="date" type="date" required /></label>
+    <label>结束日期<input name="endDate" type="date" required /></label>
+    <label class="calendar-all-day-label"><input name="allDay" type="checkbox" />全天</label>
+    <div class="calendar-time-fields"><label>开始<input name="start" type="time" required value="19:00" /></label><label>结束<input name="end" type="time" required value="20:00" /></label></div>
+    <div class="calendar-form-actions"><button type="button" data-calendar-cancel>取消</button><button type="button" data-calendar-delete hidden>删除</button><button type="submit">保存并同步</button></div>
+  </form>
+</section>
+
+<div class="reading-day-view" data-reading-day-view hidden role="dialog" aria-modal="true" aria-label="当日阅读安排">
+  <header class="reading-day-toolbar">
+    <button type="button" class="icon-button" data-day-close aria-label="返回博客"><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span></button>
+    <strong data-day-title></strong>
+    <div class="reading-day-actions">
+      <button type="button" data-day-today>今天</button>
+      <button type="button" class="icon-button" data-day-prev aria-label="前一天"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></button>
+      <button type="button" class="icon-button" data-day-next aria-label="后一天"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>
+      <button type="button" class="icon-button" data-day-refresh aria-label="同步日历"><span class="material-symbols-outlined" aria-hidden="true">sync</span></button>
+      <button type="button" class="reading-day-connect" data-day-connect hidden>连接 Google 日历</button>
+      <button type="button" class="reading-day-add" data-day-add><span class="material-symbols-outlined" aria-hidden="true">add</span><span>活动</span></button>
+    </div>
+  </header>
+  <div class="reading-day-main">
+    <div class="reading-day-schedule">
+      <div class="reading-day-all-day" data-day-all-day hidden></div>
+      <div class="reading-day-viewport" data-day-viewport><div class="reading-day-timeline" data-day-timeline></div></div>
+    </div>
+    <aside class="reading-day-editor" data-day-editor><p data-day-message>点击活动可编辑，或添加活动。</p></aside>
+  </div>
+</div>
+
+<script>
+  type ReadingEvent = {
+    id: string;
+    summary?: string;
+    start?: { dateTime?: string; date?: string };
+    end?: { dateTime?: string; date?: string };
+    htmlLink?: string;
+    recurringEventId?: string;
+    eventType?: string;
+    status?: string;
+  };
+  type TokenResponse = { access_token?: string; expires_in?: number; error?: string };
+  type TokenClient = { requestAccessToken: (config?: { prompt?: string }) => void };
+  const widget = document.querySelector<HTMLElement>('#reading-calendar');
+  if (widget) {
+    const clientId = widget.dataset.clientId || '';
+    const calendarId = widget.dataset.calendarId || 'primary';
+    const connectButton = widget.querySelector<HTMLButtonElement>('[data-calendar-connect]')!;
+    const disconnectButton = widget.querySelector<HTMLButtonElement>('[data-calendar-disconnect]')!;
+    const status = widget.querySelector<HTMLElement>('[data-calendar-status]')!;
+    const monthLabel = widget.querySelector<HTMLElement>('[data-calendar-month]')!;
+    const selectedLabel = widget.querySelector<HTMLElement>('[data-calendar-selected]')!;
+    const daysContainer = widget.querySelector<HTMLElement>('[data-calendar-days]')!;
+    const eventsContainer = widget.querySelector<HTMLElement>('[data-calendar-events]')!;
+    const addButton = widget.querySelector<HTMLButtonElement>('[data-calendar-add]')!;
+    const refreshButton = widget.querySelector<HTMLButtonElement>('[data-calendar-refresh]')!;
+    const form = widget.querySelector<HTMLFormElement>('[data-calendar-form]')!;
+    const formHome = form.parentElement!;
+    const deleteButton = widget.querySelector<HTMLButtonElement>('[data-calendar-delete]')!;
+    const allDayInput = form.elements.namedItem('allDay') as HTMLInputElement;
+    const startInput = form.elements.namedItem('start') as HTMLInputElement;
+    const endInput = form.elements.namedItem('end') as HTMLInputElement;
+    const timeFields = form.querySelector<HTMLElement>('.calendar-time-fields')!;
+    const dayView = document.querySelector<HTMLElement>('[data-reading-day-view]')!;
+    document.body.append(dayView);
+    const dayTitle = dayView.querySelector<HTMLElement>('[data-day-title]')!;
+    const dayTimeline = dayView.querySelector<HTMLElement>('[data-day-timeline]')!;
+    const dayViewport = dayView.querySelector<HTMLElement>('[data-day-viewport]')!;
+    const dayAllDay = dayView.querySelector<HTMLElement>('[data-day-all-day]')!;
+    const dayEditor = dayView.querySelector<HTMLElement>('[data-day-editor]')!;
+    const dayMessage = dayView.querySelector<HTMLElement>('[data-day-message]')!;
+    const dayConnect = dayView.querySelector<HTMLButtonElement>('[data-day-connect]')!;
+    const dayAdd = dayView.querySelector<HTMLButtonElement>('[data-day-add]')!;
+    const dayRefresh = dayView.querySelector<HTMLButtonElement>('[data-day-refresh]')!;
+    const today = new Date();
+    let month = new Date(today.getFullYear(), today.getMonth(), 1);
+    let selectedDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    let dayViewDate = selectedDay;
+    let events: ReadingEvent[] = [];
+    let token = '';
+    let tokenExpiresAt = 0;
+    const authStorageKey = `reading-calendar-auth:${clientId}:${calendarId}`;
+    let tokenClient: TokenClient | null = null;
+    let editingId = '';
+    let monthRequest = 0;
+    const pad = (value: number) => String(value).padStart(2, '0');
+    const dateKey = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    const eventDate = (event: ReadingEvent) => event.start?.date || (event.start?.dateTime ? dateKey(new Date(event.start.dateTime)) : '');
+    const eventOccursOn = (event: ReadingEvent, day: Date) => {
+      const start = event.start?.date ? new Date(`${event.start.date}T00:00:00`) : event.start?.dateTime ? new Date(event.start.dateTime) : null;
+      const end = event.end?.date ? new Date(`${event.end.date}T00:00:00`) : event.end?.dateTime ? new Date(event.end.dateTime) : null;
+      if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+      const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+      const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+      return start < dayEnd && end > dayStart;
+    };
+    const eventTimeLabel = (event: ReadingEvent, day: Date) => {
+      if (!event.start?.dateTime) return '全天';
+      const start = new Date(event.start.dateTime);
+      return start < new Date(day.getFullYear(), day.getMonth(), day.getDate()) ? '00:00' : new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(start);
+    };
+    const updateTimeFields = () => {
+      timeFields.hidden = allDayInput.checked;
+      startInput.required = !allDayInput.checked;
+      endInput.required = !allDayInput.checked;
+    };
+    const setStatus = (message: string) => {
+      status.textContent = message;
+      if (!dayView.hidden) { dayMessage.textContent = message; dayMessage.hidden = false; }
+    };
+    const hasToken = () => Boolean(token) && Date.now() < tokenExpiresAt;
+    const forgetToken = () => {
+      token = '';
+      tokenExpiresAt = 0;
+      try { sessionStorage.removeItem(authStorageKey); } catch {}
+    };
+    const rememberToken = () => {
+      try { sessionStorage.setItem(authStorageKey, JSON.stringify({ token, expiresAt: tokenExpiresAt })); } catch {}
+    };
+    const eventUrl = (id = '') => `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events${id ? `/${encodeURIComponent(id)}` : ''}`;
+
+    async function calendarRequest(url: string, options: RequestInit = {}) {
+      if (!hasToken()) {
+        forgetToken();
+        setConnected(false);
+        throw new Error('授权已过期，请重新连接。');
+      }
+      const response = await fetch(url, { cache: 'no-store', ...options, headers: { Authorization: `Bearer ${token}`, ...(options.body ? { 'Content-Type': 'application/json' } : {}) } });
+      if (response.status === 401) {
+        forgetToken();
+        setConnected(false);
+        throw new Error('授权已过期，请重新连接。');
+      }
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null);
+        throw new Error(detail?.error?.message || `Google 日历请求失败（${response.status}）。`);
+      }
+      return response.status === 204 ? null : response.json();
+    }
+
+    function setConnected(connected: boolean) {
+      connectButton.hidden = connected;
+      disconnectButton.hidden = !connected;
+      refreshButton.hidden = !connected;
+      addButton.hidden = !connected;
+      dayConnect.hidden = connected;
+      dayAdd.hidden = !connected;
+      dayRefresh.hidden = !connected;
+      if (!connected) { monthRequest++; events = []; form.hidden = true; render(); }
+    }
+
+    function render() {
+      monthLabel.textContent = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long' }).format(month);
+      selectedLabel.textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(selectedDay);
+      daysContainer.replaceChildren();
+      const offset = (new Date(month.getFullYear(), month.getMonth(), 1).getDay() + 6) % 7;
+      const dayCount = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+      for (let i = 0; i < offset; i++) daysContainer.append(document.createElement('span'));
+      for (let day = 1; day <= dayCount; day++) {
+        const date = new Date(month.getFullYear(), month.getMonth(), day);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = String(day);
+        button.setAttribute('aria-label', `${month.getMonth() + 1}月${day}日`);
+        if (dateKey(date) === dateKey(today)) button.classList.add('today');
+        if (dateKey(date) === dateKey(selectedDay)) button.classList.add('selected');
+        if (events.some((event) => eventOccursOn(event, date))) button.classList.add('has-event');
+        button.addEventListener('click', () => openDay(date));
+        daysContainer.append(button);
+      }
+      eventsContainer.replaceChildren();
+      if (!hasToken()) { if (!dayView.hidden) renderDay(); return; }
+      const dayEvents = events.filter((event) => eventOccursOn(event, selectedDay));
+      if (!dayEvents.length) {
+        const empty = document.createElement('p');
+        empty.className = 'calendar-empty';
+        empty.textContent = '无活动';
+        eventsContainer.append(empty);
+      }
+      for (const event of dayEvents) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'calendar-event';
+        const time = document.createElement('small');
+        time.textContent = eventTimeLabel(event, selectedDay);
+        const name = document.createElement('span');
+        name.textContent = event.summary || '未命名活动';
+        button.append(time, name);
+        if (event.recurringEventId) button.title = '重复活动实例；编辑或删除仅影响本次';
+        button.addEventListener('click', () => openForm(event));
+        eventsContainer.append(button);
+      }
+      if (!dayView.hidden) renderDay();
+    }
+
+    function openDay(date: Date) {
+      dayViewDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      selectedDay = dayViewDate;
+      month = new Date(date.getFullYear(), date.getMonth(), 1);
+      form.hidden = true;
+      dayView.hidden = false;
+      document.body.classList.add('reading-day-open');
+      document.documentElement.dataset.drawer = '';
+      document.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((button) => button.setAttribute('aria-expanded', 'false'));
+      render();
+      dayView.querySelector<HTMLButtonElement>('[data-day-close]')?.focus();
+      dayViewport.scrollTop = (dateKey(date) === dateKey(new Date()) ? Math.max(0, new Date().getHours() - 1) : 8) * 64;
+      if (hasToken()) void loadMonth();
+    }
+
+    function closeDay() {
+      form.hidden = true;
+      formHome.append(form);
+      dayView.hidden = true;
+      document.body.classList.remove('reading-day-open');
+      render();
+    }
+
+    function showDayEditor(event?: ReadingEvent) {
+      if (!hasToken()) return;
+      selectedDay = dayViewDate;
+      dayEditor.append(form);
+      dayMessage.hidden = true;
+      openForm(event);
+    }
+
+    function renderDay() {
+      dayTitle.textContent = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(dayViewDate);
+      dayMessage.textContent = hasToken() ? '点击活动可编辑，或添加活动。' : '连接 Google 日历后查看当日安排。';
+      dayMessage.hidden = form.parentElement === dayEditor && !form.hidden;
+      dayTimeline.replaceChildren();
+      dayAllDay.replaceChildren();
+      const dayEvents = events.filter((event) => eventOccursOn(event, dayViewDate));
+      const timed: { event: ReadingEvent; start: number; end: number; column?: number; columns?: number }[] = [];
+      for (let hour = 0; hour < 24; hour++) {
+        const row = document.createElement('div');
+        row.className = 'reading-day-hour';
+        row.style.top = `${hour * 64}px`;
+        const label = document.createElement('span');
+        label.textContent = `${pad(hour)}:00`;
+        row.append(label);
+        dayTimeline.append(row);
+      }
+      for (const event of dayEvents) {
+        if (!event.start?.dateTime) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'reading-day-all-day-event';
+          button.textContent = event.summary || '未命名活动';
+          if (event.recurringEventId) button.title = '重复活动实例；编辑或删除仅影响本次';
+          button.addEventListener('click', () => showDayEditor(event));
+          dayAllDay.append(button);
+          continue;
+        }
+        const startDate = new Date(event.start.dateTime);
+        const endDate = event.end?.dateTime ? new Date(event.end.dateTime) : new Date(startDate.getTime() + 3600000);
+        const dayStart = new Date(dayViewDate.getFullYear(), dayViewDate.getMonth(), dayViewDate.getDate()).getTime();
+        const start = Math.max(0, (startDate.getTime() - dayStart) / 60000);
+        const end = Math.min(1440, (endDate.getTime() - dayStart) / 60000);
+        if (end > start) timed.push({ event, start, end });
+      }
+      dayAllDay.hidden = !dayAllDay.childElementCount;
+      timed.sort((a, b) => a.start - b.start);
+      const groups: typeof timed[] = [];
+      for (const item of timed) {
+        const lastGroup = groups.at(-1);
+        if (lastGroup && item.start < Math.max(...lastGroup.map((entry) => entry.end))) lastGroup.push(item);
+        else groups.push([item]);
+      }
+      for (const group of groups) {
+        const columnEnds: number[] = [];
+        for (const item of group) {
+          let column = columnEnds.findIndex((end) => end <= item.start);
+          if (column < 0) column = columnEnds.length;
+          columnEnds[column] = item.end;
+          item.column = column;
+        }
+        for (const item of group) item.columns = columnEnds.length;
+      }
+      for (const item of timed) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'reading-day-event';
+        button.style.top = `${item.start / 60 * 64}px`;
+        button.style.height = `${Math.max(30, (item.end - item.start) / 60 * 64)}px`;
+        button.style.left = `calc(76px + (100% - 90px) * ${item.column || 0} / ${item.columns || 1})`;
+        button.style.width = `calc((100% - 90px) / ${item.columns || 1} - 4px)`;
+        const time = document.createElement('small');
+        time.textContent = `${pad(Math.floor(item.start / 60))}:${pad(item.start % 60)}`;
+        const name = document.createElement('strong');
+        name.textContent = item.event.summary || '未命名活动';
+        button.append(time, name);
+        if (item.event.recurringEventId) button.title = '重复活动实例；编辑或删除仅影响本次';
+        button.addEventListener('click', () => showDayEditor(item.event));
+        dayTimeline.append(button);
+      }
+      if (dateKey(dayViewDate) === dateKey(new Date())) {
+        const line = document.createElement('div');
+        line.className = 'reading-day-now';
+        const now = new Date();
+        line.style.top = `${(now.getHours() * 60 + now.getMinutes()) / 60 * 64}px`;
+        dayTimeline.append(line);
+      }
+    }
+
+    async function loadMonth() {
+      if (!hasToken()) { forgetToken(); setConnected(false); setStatus('授权已过期，请重新连接。'); return; }
+      const requestId = ++monthRequest;
+      setStatus('同步中…');
+      const params = new URLSearchParams({
+        timeMin: new Date(month.getFullYear(), month.getMonth(), 1).toISOString(),
+        timeMax: new Date(month.getFullYear(), month.getMonth() + 1, 1).toISOString(),
+        singleEvents: 'true', orderBy: 'startTime', maxResults: '2500',
+      });
+      try {
+        const loaded: ReadingEvent[] = [];
+        let pageToken = '';
+        do {
+          if (pageToken) params.set('pageToken', pageToken);
+          const result = await calendarRequest(`${eventUrl()}?${params}`);
+          if (requestId !== monthRequest) return;
+          loaded.push(...(result.items || []));
+          pageToken = result.nextPageToken || '';
+        } while (pageToken);
+        if (requestId !== monthRequest) return;
+        events = loaded.filter((event) => event.status !== 'cancelled');
+        setStatus('已与 Google 日历同步');
+        render();
+      } catch (error) { if (requestId === monthRequest) setStatus(error instanceof Error ? error.message : '同步失败。'); }
+    }
+
+    function openForm(event?: ReadingEvent) {
+      editingId = event?.id || '';
+      form.hidden = false;
+      deleteButton.hidden = !editingId;
+      const title = form.elements.namedItem('title') as HTMLInputElement;
+      const date = form.elements.namedItem('date') as HTMLInputElement;
+      const endDateInput = form.elements.namedItem('endDate') as HTMLInputElement;
+      title.value = event?.summary || '';
+      date.value = event ? eventDate(event) : dateKey(selectedDay);
+      const startDate = event?.start?.dateTime ? new Date(event.start.dateTime) : null;
+      const endDate = event?.end?.dateTime ? new Date(event.end.dateTime) : null;
+      allDayInput.checked = Boolean(event?.start?.date);
+      const exclusiveEnd = event?.end?.date ? new Date(`${event.end.date}T00:00:00`) : null;
+      if (exclusiveEnd) exclusiveEnd.setDate(exclusiveEnd.getDate() - 1);
+      endDateInput.value = exclusiveEnd ? dateKey(exclusiveEnd) : endDate ? dateKey(endDate) : date.value;
+      startInput.value = startDate ? `${pad(startDate.getHours())}:${pad(startDate.getMinutes())}` : '19:00';
+      endInput.value = endDate ? `${pad(endDate.getHours())}:${pad(endDate.getMinutes())}` : '20:00';
+      updateTimeFields();
+      title.focus();
+    }
+
+    function loadGoogleIdentity(): Promise<void> {
+      if ((window as any).google?.accounts?.oauth2) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('无法加载 Google 授权服务。'));
+        document.head.append(script);
+      });
+    }
+
+    connectButton.addEventListener('click', () => {
+      if (!tokenClient) { setStatus('Google 授权服务尚未就绪。'); return; }
+      tokenClient.requestAccessToken();
+    });
+    dayConnect.addEventListener('click', () => {
+      if (!tokenClient) { dayMessage.textContent = 'Google 授权服务尚未就绪。'; return; }
+      tokenClient.requestAccessToken();
+    });
+    disconnectButton.addEventListener('click', () => { forgetToken(); setConnected(false); setStatus('已断开连接'); });
+    widget.querySelector('[data-calendar-prev]')?.addEventListener('click', () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); selectedDay = new Date(month.getFullYear(), month.getMonth(), 1); render(); if (hasToken()) void loadMonth(); });
+    widget.querySelector('[data-calendar-next]')?.addEventListener('click', () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); selectedDay = new Date(month.getFullYear(), month.getMonth(), 1); render(); if (hasToken()) void loadMonth(); });
+    refreshButton.addEventListener('click', () => { void loadMonth(); });
+    dayView.querySelector('[data-day-close]')?.addEventListener('click', closeDay);
+    dayView.querySelector('[data-day-prev]')?.addEventListener('click', () => openDay(new Date(dayViewDate.getFullYear(), dayViewDate.getMonth(), dayViewDate.getDate() - 1)));
+    dayView.querySelector('[data-day-next]')?.addEventListener('click', () => openDay(new Date(dayViewDate.getFullYear(), dayViewDate.getMonth(), dayViewDate.getDate() + 1)));
+    dayView.querySelector('[data-day-today]')?.addEventListener('click', () => openDay(new Date()));
+    dayRefresh.addEventListener('click', () => { void loadMonth(); });
+    dayAdd.addEventListener('click', () => showDayEditor());
+    allDayInput.addEventListener('change', updateTimeFields);
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !dayView.hidden) closeDay(); });
+    addButton.addEventListener('click', () => openForm());
+    widget.querySelector('[data-calendar-cancel]')?.addEventListener('click', () => { form.hidden = true; if (!dayView.hidden) renderDay(); });
+
+    form.addEventListener('submit', async (submitEvent) => {
+      submitEvent.preventDefault();
+      const title = (form.elements.namedItem('title') as HTMLInputElement).value.trim();
+      const date = (form.elements.namedItem('date') as HTMLInputElement).value;
+      const lastDate = (form.elements.namedItem('endDate') as HTMLInputElement).value;
+      if (!title || !date || !lastDate || lastDate < date) { setStatus('请填写标题，并确保结束日期不早于开始日期。'); return; }
+      const startDate = new Date(`${date}T${allDayInput.checked ? '00:00' : startInput.value}:00`);
+      const endDate = new Date(`${lastDate}T${allDayInput.checked ? '00:00' : endInput.value}:00`);
+      if (allDayInput.checked) endDate.setDate(endDate.getDate() + 1);
+      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || !(endDate > startDate)) {
+        setStatus('请确保结束时间晚于开始时间。'); return;
+      }
+      const body = allDayInput.checked
+        ? { summary: title, start: { date }, end: { date: dateKey(endDate) } }
+        : { summary: title, start: { dateTime: startDate.toISOString() }, end: { dateTime: endDate.toISOString() } };
+      setStatus('保存中…');
+      try {
+        await calendarRequest(eventUrl(editingId), { method: editingId ? 'PATCH' : 'POST', body: JSON.stringify(body) });
+        form.hidden = true;
+        selectedDay = startDate;
+        if (!dayView.hidden) dayViewDate = startDate;
+        month = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        await loadMonth();
+      } catch (error) { setStatus(error instanceof Error ? error.message : '保存失败。'); }
+    });
+
+    deleteButton.addEventListener('click', async () => {
+      const editingEvent = events.find((event) => event.id === editingId);
+      const question = editingEvent?.recurringEventId
+        ? '删除这一次重复活动？Google 日历中的本次实例也会删除。'
+        : '删除这条活动？Google 日历中的对应活动也会删除。';
+      if (!editingId || !window.confirm(question)) return;
+      setStatus('删除中…');
+      try {
+        await calendarRequest(eventUrl(editingId), { method: 'DELETE' });
+        form.hidden = true;
+        await loadMonth();
+      } catch (error) { setStatus(error instanceof Error ? error.message : '删除失败。'); }
+    });
+    window.addEventListener('focus', () => { if (hasToken()) void loadMonth(); });
+    connectButton.disabled = true;
+    setConnected(false);
+    setStatus(clientId ? '加载 Google 授权服务…' : '请先配置 Google OAuth Client ID。');
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(authStorageKey) || 'null');
+      if (typeof saved?.token === 'string' && typeof saved?.expiresAt === 'number' && saved.expiresAt > Date.now() + 60000) {
+        token = saved.token;
+        tokenExpiresAt = saved.expiresAt;
+        setConnected(true);
+        void loadMonth();
+      } else sessionStorage.removeItem(authStorageKey);
+    } catch { forgetToken(); }
+    if (clientId) {
+      void loadGoogleIdentity().then(() => {
+        tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/calendar.events',
+          callback: (response: TokenResponse) => {
+            if (!response.access_token) { setStatus(response.error || '授权未完成。'); return; }
+            token = response.access_token;
+            tokenExpiresAt = Date.now() + Math.max(0, (response.expires_in || 3600) - 60) * 1000;
+            rememberToken();
+            setConnected(true);
+            void loadMonth();
+          },
+        });
+        connectButton.disabled = false;
+        if (!hasToken()) setStatus('连接后显示 Google 日历活动');
+      }).catch((error) => setStatus(error instanceof Error ? error.message : 'Google 授权服务加载失败。'));
+    }
+    render();
+  }
+</script>
