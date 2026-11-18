@@ -1,0 +1,125 @@
+---
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import { allPosts, formatDate, urlForPost } from '../../lib/posts';
+const posts = await allPosts();
+const base = import.meta.env.BASE_URL;
+const dateKey = (date: Date) => {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return `${value('year')}-${value('month')}-${value('day')}`;
+};
+const searchText = (post: (typeof posts)[number]) => [
+  post.data.title,
+  post.data.description,
+  post.data.category,
+  ...post.data.tags,
+  dateKey(post.data.date),
+  post.body || '',
+].join(' ').toLocaleLowerCase();
+---
+<SiteLayout title="搜索" description="搜索站内内容" posts={posts}>
+  <section class="content-section search-page" id="search">
+    <div class="section-heading"><h1>搜索</h1></div>
+    <form class="site-search-form" data-search-form role="search" action={`${base}search/`} method="get">
+      <span class="material-symbols-outlined" aria-hidden="true">search</span>
+      <input type="search" name="q" data-search-input aria-label="搜索站内内容" placeholder="搜索站内内容" autocomplete="off" />
+      <div class="site-search-date">
+        <span class="material-symbols-outlined" aria-hidden="true">event</span>
+        <input type="hidden" name="date" data-search-date />
+        <button type="button" class="site-search-date-trigger" data-search-date-trigger aria-label="按发布日期搜索" aria-haspopup="dialog" aria-expanded="false"><span data-search-date-label>选择日期</span><span class="material-symbols-outlined" aria-hidden="true">arrow_drop_down</span></button>
+        <button type="button" data-search-clear-date aria-label="清除日期" title="清除日期" hidden><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
+        <div class="site-search-calendar" data-search-calendar role="dialog" aria-label="选择发布日期" hidden>
+          <div class="site-search-calendar-head"><strong data-search-calendar-month></strong><div><button type="button" data-search-calendar-prev aria-label="上个月"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></button><button type="button" data-search-calendar-next aria-label="下个月"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button></div></div>
+          <div class="site-search-calendar-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div class="site-search-calendar-days" data-search-calendar-days></div>
+          <div class="site-search-calendar-footer"><button type="button" data-search-calendar-today>今天</button></div>
+        </div>
+      </div>
+    </form>
+    <div class="post-grid search-results" data-search-results>
+      {posts.map((post) => <a class="post-card" data-search-item data-search-text={searchText(post)} data-search-date={dateKey(post.data.date)} href={urlForPost(post, base)}><div class="post-card-top"><span class="category-tag">{post.data.category}</span><span class="material-symbols-outlined" aria-hidden="true">arrow_outward</span></div><h2>{post.data.title}</h2><p>{post.data.description}</p><div class="post-meta"><time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time></div></a>)}
+    </div>
+    <div class="empty-state search-empty" data-search-empty hidden><p>暂无内容</p></div>
+  </section>
+<script>
+  document.addEventListener('astro:page-load', () => {
+    const form = document.querySelector<HTMLFormElement>('[data-search-form]');
+    if (!form) return;
+    const input = form.querySelector<HTMLInputElement>('[data-search-input]')!;
+    const date = form.querySelector<HTMLInputElement>('[data-search-date]')!;
+    const dateTrigger = form.querySelector<HTMLButtonElement>('[data-search-date-trigger]')!;
+    const dateLabel = form.querySelector<HTMLElement>('[data-search-date-label]')!;
+    const calendar = form.querySelector<HTMLElement>('[data-search-calendar]')!;
+    const calendarMonth = form.querySelector<HTMLElement>('[data-search-calendar-month]')!;
+    const calendarDays = form.querySelector<HTMLElement>('[data-search-calendar-days]')!;
+    const clearDate = form.querySelector<HTMLButtonElement>('[data-search-clear-date]')!;
+    const items = [...document.querySelectorAll<HTMLElement>('[data-search-item]')];
+    const empty = document.querySelector<HTMLElement>('[data-search-empty]')!;
+    const results = document.querySelector<HTMLElement>('[data-search-results]')!;
+    const params = new URLSearchParams(location.search);
+    input.value = params.get('q') || '';
+    date.value = params.get('date') || '';
+    const today = new Date();
+    const todayParts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(today);
+    const todayPart = (type: string) => todayParts.find((part) => part.type === type)?.value || '';
+    const localToday = `${todayPart('year')}-${todayPart('month')}-${todayPart('day')}`;
+    let visibleMonth = date.value && /^\d{4}-\d{2}-\d{2}$/.test(date.value) ? new Date(`${date.value.slice(0, 7)}-01T12:00:00`) : new Date(`${localToday.slice(0, 7)}-01T12:00:00`);
+    const keyFor = (year: number, month: number, day: number) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const closeCalendar = () => { calendar.hidden = true; dateTrigger.setAttribute('aria-expanded', 'false'); };
+    const drawCalendar = () => {
+      const year = visibleMonth.getFullYear();
+      const month = visibleMonth.getMonth();
+      calendarMonth.textContent = `${year}年${month + 1}月`;
+      calendarDays.replaceChildren();
+      const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      for (let cell = 0; cell < Math.ceil((firstWeekday + daysInMonth) / 7) * 7; cell++) {
+        const cellDate = new Date(year, month, cell - firstWeekday + 1);
+        const key = keyFor(cellDate.getFullYear(), cellDate.getMonth() + 1, cellDate.getDate());
+        const dayButton = document.createElement('button');
+        dayButton.type = 'button';
+        dayButton.textContent = String(cellDate.getDate());
+        dayButton.setAttribute('aria-label', `${cellDate.getFullYear()}年${cellDate.getMonth() + 1}月${cellDate.getDate()}日`);
+        dayButton.classList.toggle('outside', cellDate.getMonth() !== month);
+        dayButton.classList.toggle('today', key === localToday);
+        dayButton.classList.toggle('selected', key === date.value);
+        if (key === date.value) dayButton.setAttribute('aria-current', 'date');
+        dayButton.addEventListener('click', () => { date.value = key; visibleMonth = new Date(cellDate.getFullYear(), cellDate.getMonth(), 1); render(); closeCalendar(); dateTrigger.focus(); });
+        calendarDays.append(dayButton);
+      }
+    };
+    const render = () => {
+      const words = input.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      let visible = 0;
+      for (const item of items) {
+        const matchesText = words.every((word) => (item.dataset.searchText || '').includes(word));
+        item.hidden = !matchesText || Boolean(date.value && item.dataset.searchDate !== date.value);
+        if (!item.hidden) visible++;
+      }
+      clearDate.hidden = !date.value;
+      dateLabel.textContent = date.value ? `${Number(date.value.slice(5, 7))}月${Number(date.value.slice(8, 10))}日` : '选择日期';
+      results.hidden = visible === 0;
+      empty.hidden = visible !== 0;
+    };
+    input.addEventListener('input', render);
+    dateTrigger.addEventListener('click', () => { if (!calendar.hidden) { closeCalendar(); return; } drawCalendar(); calendar.hidden = false; dateTrigger.setAttribute('aria-expanded', 'true'); });
+    form.querySelector('[data-search-calendar-prev]')?.addEventListener('click', () => { visibleMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1); drawCalendar(); });
+    form.querySelector('[data-search-calendar-next]')?.addEventListener('click', () => { visibleMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1); drawCalendar(); });
+    form.querySelector('[data-search-calendar-today]')?.addEventListener('click', () => { date.value = localToday; visibleMonth = new Date(`${localToday.slice(0, 7)}-01T12:00:00`); render(); closeCalendar(); dateTrigger.focus(); });
+    clearDate.addEventListener('click', () => { date.value = ''; render(); closeCalendar(); dateTrigger.focus(); });
+    const controller = new AbortController();
+    document.addEventListener('astro:before-swap', () => controller.abort(), { once: true, signal: controller.signal });
+    document.addEventListener('pointerdown', (event) => { if (!form.contains(event.target as Node)) closeCalendar(); }, { signal: controller.signal });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !calendar.hidden) { closeCalendar(); dateTrigger.focus(); } }, { signal: controller.signal });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const url = new URL(form.action);
+      if (input.value.trim()) url.searchParams.set('q', input.value.trim());
+      if (date.value) url.searchParams.set('date', date.value);
+      history.replaceState(history.state, '', url);
+      render();
+    });
+    render();
+  });
+</script>
+</SiteLayout>

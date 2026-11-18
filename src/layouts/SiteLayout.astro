@@ -73,6 +73,7 @@ const currentPath = Astro.url.pathname;
         <header class="topbar">
           <button class="icon-button mobile-menu" type="button" data-open="left" aria-label="打开导航" aria-controls="left-drawer" aria-expanded="false"><span class="material-symbols-outlined" aria-hidden="true">menu</span></button>
           <a class="topbar-title" href={base}>博客</a>
+          <a class="icon-button topbar-search" href={`${base}search/`} aria-label="搜索站内内容" title="搜索"><span class="material-symbols-outlined" aria-hidden="true">search</span></a>
           <button class="icon-button mobile-tools" type="button" data-open="right" aria-label="打开阅读工具" aria-controls="right-drawer" aria-expanded="false"><span class="material-symbols-outlined" aria-hidden="true">tune</span></button>
         </header>
         <main id="main"><slot /></main>
