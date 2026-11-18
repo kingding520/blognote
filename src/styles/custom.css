@@ -11,6 +11,26 @@
   border: 0;
 }
 
+/* 浅色模式：淡紫色的选中项和按钮使用白色文字、图标 */
+:root[data-theme='light'] { --primary: #8564b0; }
+:root[data-theme='light'] :is(
+  .nav-item.active,
+  .nav-item:hover,
+  .filter-chip.selected,
+  .filter-chip:hover,
+  .category-tag,
+  .tool-button:hover,
+  .calendar-connect,
+  .calendar-add,
+  .calendar-days button.selected,
+  .calendar-event:hover,
+  .calendar-form-actions button[type='submit'],
+  .reading-day-actions > .reading-day-add,
+  .reading-day-actions > .reading-day-connect,
+  .reading-day-all-day-event,
+  .reading-day-event:hover
+) { color: #fff; }
+
 /* 页面框架：去掉两侧竖线和顶部横线 */
 .rail-left { border-right: 0; }
 .rail-right { border-left: 0; }
