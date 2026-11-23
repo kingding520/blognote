@@ -73,6 +73,26 @@
 .site-search-calendar-footer button:hover { background: var(--search-calendar-hover); }
 .search-results[hidden], .search-results .post-card[hidden], .search-empty[hidden] { display: none; }
 .search-empty { min-height: 220px; }
+.category-index { align-items: stretch; }
+.folder-card { display: flex; align-items: center; gap: 14px; min-height: 96px; padding: 22px 24px; border-radius: 28px; background: var(--card); color: var(--card-text); transition: transform .18s, box-shadow .18s; }
+.folder-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.folder-card > .material-symbols-outlined:first-child { color: var(--primary-strong); }
+.folder-card strong { min-width: 0; overflow-wrap: anywhere; font-size: 18px; }
+.folder-count { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 50%; background: var(--primary); color: #2b2040; font-size: 12px; }
+.folder-arrow { margin-left: auto; font-size: 21px; }
+:root:not([data-theme='light']) .folder-card { background: var(--summary-background); color: var(--summary-text); }
+:root:not([data-theme='light']) .folder-card > .material-symbols-outlined:first-child { color: var(--primary); }
+.code-block { position: relative; }
+.code-block > pre { padding-top: 52px; }
+.code-copy { position: absolute; top: 10px; right: 10px; z-index: 1; width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 12px; background: var(--surface); color: var(--primary); cursor: pointer; }
+.code-copy:hover { background: var(--primary); color: #2b2040; }
+:root[data-theme='light'] .code-copy { background: #242129; color: #fff; }
+:root[data-theme='light'] .code-copy:hover { background: #39343f; color: #fff; }
+.code-copy .material-symbols-outlined { font-size: 18px; }
+.prose .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 6px 0; }
+.mermaid-diagram { max-width: 100%; overflow-x: auto; margin: 24px 0; padding: 20px; border-radius: 24px; background: var(--surface-high); text-align: center; }
+.mermaid-diagram[hidden] { display: none; }
+.mermaid-diagram svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 @media (max-width: 600px) {
   .site-search-form { flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
   .site-search-date { width: 100%; padding: 9px 0 0; border-left: 0; border-top: 1px solid var(--line); }

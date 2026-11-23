@@ -16,10 +16,115 @@ const base = import.meta.env.BASE_URL;
 ---
 <SiteLayout title={post.data.title} description={post.data.description} posts={posts} activeCategory={post.data.category} toc={headings.filter((heading) => heading.depth <= 3)}>
   <article class="article-page">
-    <div class="breadcrumbs"><a href={base}>首页</a><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span><a href={urlForCategory(post.data.category, base)}>{post.data.category}</a></div>
+    <div class="breadcrumbs"><a href={`${base}posts/`}>文章</a><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span><a href={urlForCategory(post.data.category, base)}>{post.data.category}</a></div>
     <header class="article-header"><span class="category-tag">{post.data.category}</span><h1>{post.data.title}</h1><p class="article-description">{post.data.description}</p><div class="article-meta"><time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>{post.data.tags.length > 0 && <span>{post.data.tags.join(' · ')}</span>}</div></header>
     <div class="prose"><Content /></div>
     <nav class="post-pager" aria-label="同分类文章导航"><div>{previous && <a href={urlForPost(previous, base)}><small><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>上一篇</small><strong>{previous.data.title}</strong></a>}</div><div>{next && <a href={urlForPost(next, base)}><small>下一篇<span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></small><strong>{next.data.title}</strong></a>}</div></nav>
     <a class="category-back" href={urlForCategory(post.data.category, base)}><span class="material-symbols-outlined" aria-hidden="true">folder</span>{post.data.category}</a>
   </article>
+  <script>
+    document.addEventListener('astro:page-load', () => {
+      const diagrams = [...document.querySelectorAll<HTMLElement>('.article-page .prose pre[data-language="mermaid"]')].map((pre) => {
+        const container = document.createElement('div');
+        container.className = 'mermaid-diagram';
+        container.setAttribute('role', 'img');
+        container.setAttribute('aria-label', 'Mermaid 图');
+        container.hidden = true;
+        pre.after(container);
+        return { pre, container, source: pre.textContent || '' };
+      });
+      if (diagrams.length) {
+        const controller = new AbortController();
+        document.addEventListener('astro:before-swap', () => controller.abort(), { once: true, signal: controller.signal });
+        let renderNumber = 0;
+        let pending = Promise.resolve();
+        const renderDiagrams = async () => {
+          const mermaid = (await import('mermaid')).default;
+          if (controller.signal.aborted) return;
+          const light = document.documentElement.dataset.theme === 'light';
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: 'base',
+            themeVariables: light ? {
+              darkMode: false,
+              background: '#f6f3fb',
+              primaryColor: '#e4dff6', primaryTextColor: '#24212a', primaryBorderColor: '#8564b0',
+              secondaryColor: '#eee9f6', secondaryTextColor: '#24212a',
+              tertiaryColor: '#fff', tertiaryTextColor: '#24212a',
+              textColor: '#24212a', nodeTextColor: '#24212a', titleColor: '#24212a',
+              lineColor: '#8564b0', clusterBkg: '#eee9f6', clusterBorder: '#8564b0',
+              edgeLabelBackground: '#f6f3fb',
+            } : {
+              darkMode: true,
+              background: '#141316',
+              primaryColor: '#353047', primaryTextColor: '#f0edf3', primaryBorderColor: '#c8b4ff',
+              secondaryColor: '#29272e', secondaryTextColor: '#f0edf3',
+              tertiaryColor: '#1d1c20', tertiaryTextColor: '#f0edf3',
+              textColor: '#f0edf3', nodeTextColor: '#f0edf3', titleColor: '#f0edf3',
+              lineColor: '#c8b4ff', clusterBkg: '#1d1c20', clusterBorder: '#a88cca',
+              edgeLabelBackground: '#29272e',
+            },
+          });
+          for (const diagram of diagrams) {
+            if (controller.signal.aborted) return;
+            try {
+              const { svg } = await mermaid.render(`blog-mermaid-${++renderNumber}`, diagram.source);
+              if (controller.signal.aborted) return;
+              diagram.container.innerHTML = svg;
+              diagram.container.hidden = false;
+              diagram.pre.hidden = true;
+            } catch (error) {
+              diagram.container.hidden = true;
+              diagram.pre.hidden = false;
+              console.error('Mermaid 图渲染失败', error);
+            }
+          }
+        };
+        const scheduleRender = () => { pending = pending.then(renderDiagrams).catch((error) => console.error('Mermaid 加载失败', error)); };
+        scheduleRender();
+        const observer = new MutationObserver(() => scheduleRender());
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        controller.signal.addEventListener('abort', () => observer.disconnect(), { once: true });
+      }
+      document.querySelectorAll<HTMLElement>('.article-page .prose pre').forEach((pre) => {
+        if (pre.dataset.language === 'mermaid') return;
+        if (pre.parentElement?.classList.contains('code-block')) return;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-block';
+        pre.parentNode?.insertBefore(wrapper, pre);
+        wrapper.append(pre);
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'code-copy';
+        button.setAttribute('aria-label', '复制代码');
+        button.title = '复制代码';
+        const icon = document.createElement('span');
+        icon.className = 'material-symbols-outlined';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = 'content_copy';
+        button.append(icon);
+        wrapper.append(button);
+
+        button.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(pre.querySelector('code')?.textContent ?? pre.textContent ?? '');
+            icon.textContent = 'check';
+            button.setAttribute('aria-label', '已复制');
+            button.title = '已复制';
+          } catch {
+            icon.textContent = 'error';
+            button.setAttribute('aria-label', '复制失败');
+            button.title = '复制失败';
+          }
+          setTimeout(() => {
+            icon.textContent = 'content_copy';
+            button.setAttribute('aria-label', '复制代码');
+            button.title = '复制代码';
+          }, 1800);
+        });
+      });
+    });
+  </script>
 </SiteLayout>

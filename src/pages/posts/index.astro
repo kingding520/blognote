@@ -1,13 +1,13 @@
 ---
 import SiteLayout from '../../layouts/SiteLayout.astro';
-import { allPosts, categories, formatDate, urlForCategory, urlForPost } from '../../lib/posts';
+import { allPosts, categories, urlForCategory } from '../../lib/posts';
 const posts = await allPosts();
+const folders = categories(posts);
 const base = import.meta.env.BASE_URL;
 ---
-<SiteLayout title="文章" description="全部文章" posts={posts}>
+<SiteLayout title="文章" description="文章分类" posts={posts}>
   <section class="content-section" id="articles">
-    <div class="section-heading"><h1>全部文章</h1><span class="count-pill">{posts.length}</span></div>
-    {categories(posts).length > 0 && <nav class="filter-list" aria-label="分类"><span class="filter-chip selected" aria-current="page">全部</span>{categories(posts).map((category) => <a class="filter-chip" href={urlForCategory(category, base)}>{category}</a>)}</nav>}
-    {posts.length > 0 ? <div class="post-grid">{posts.map((post) => <a class="post-card" href={urlForPost(post, base)}><div class="post-card-top"><span class="category-tag">{post.data.category}</span><span class="material-symbols-outlined" aria-hidden="true">arrow_outward</span></div><h2>{post.data.title}</h2><p>{post.data.description}</p><div class="post-meta"><time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time></div></a>)}</div> : <div class="empty-state"><span class="material-symbols-outlined" aria-hidden="true">article</span><p>暂无文章</p></div>}
+    <div class="section-heading"><h1>文章</h1><span class="count-pill">{folders.length}</span></div>
+    {folders.length > 0 ? <div class="post-grid category-index">{folders.map((category) => <a class="folder-card" href={urlForCategory(category, base)}><span class="material-symbols-outlined" aria-hidden="true">folder</span><strong>{category}</strong><span class="folder-count">{posts.filter((post) => post.data.category === category).length}</span><span class="material-symbols-outlined folder-arrow" aria-hidden="true">arrow_forward</span></a>)}</div> : <div class="empty-state"><span class="material-symbols-outlined" aria-hidden="true">folder</span><p>暂无内容</p></div>}
   </section>
 </SiteLayout>

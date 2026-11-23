@@ -1,11 +1,11 @@
 ---
 import type { Post } from '../lib/posts';
-import { categories, urlForCategory } from '../lib/posts';
 import { profile } from '../site.config';
 import ReadingCalendar from '../components/ReadingCalendar.astro';
 import { ClientRouter } from 'astro:transitions';
 import '../styles/global.css';
 import '../styles/custom.css';
+import 'katex/dist/katex.min.css';
 
 interface Props {
   title: string;
@@ -15,7 +15,7 @@ interface Props {
   toc?: { depth: number; slug: string; text: string }[];
 }
 
-const { title, description, posts, activeCategory, toc = [] } = Astro.props;
+const { title, description, toc = [] } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const currentPath = Astro.url.pathname;
 ---
@@ -63,8 +63,7 @@ const currentPath = Astro.url.pathname;
           {(profile.name || profile.bio || profile.avatar) && <div class="profile rail-label">{profile.avatar ? <img src={profile.avatar} alt="作者头像" /> : <span class="material-symbols-outlined" aria-hidden="true">account_circle</span>}<div>{profile.name && <strong>{profile.name}</strong>}{profile.bio && <p>{profile.bio}</p>}</div></div>}
           <nav class="nav-list" aria-label="主要导航">
             <a class:list={["nav-item", { active: currentPath === base }]} href={base} title="首页"><span class="material-symbols-outlined" aria-hidden="true">home</span><span class="rail-label">首页</span></a>
-            <a class:list={["nav-item", { active: currentPath.startsWith(`${base}posts/`) }]} href={`${base}posts/`} title="文章"><span class="material-symbols-outlined" aria-hidden="true">description</span><span class="rail-label">文章</span></a>
-            {categories(posts).map((category) => <a class:list={["nav-item", { active: activeCategory === category && currentPath.startsWith(`${base}category/`) }]} href={urlForCategory(category, base)} title={category}><span class="material-symbols-outlined" aria-hidden="true">folder</span><span class="rail-label">{category}</span></a>)}
+            <a class:list={["nav-item", { active: currentPath.startsWith(`${base}posts/`) || currentPath.startsWith(`${base}category/`) }]} href={`${base}posts/`} title="文章"><span class="material-symbols-outlined" aria-hidden="true">description</span><span class="rail-label">文章</span></a>
           </nav>
           {toc.length > 0 && <div class="toc-wrap rail-label"><div class="rail-section-title">目录</div><nav aria-label="本文目录">{toc.map((item) => <a class:list={["toc-link", { nested: item.depth > 2 }]} href={`#${item.slug}`}>{item.text}</a>)}</nav></div>}
         </div>
