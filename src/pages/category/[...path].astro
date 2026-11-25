@@ -1,0 +1,24 @@
+---
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import { allPosts, childFolders, folderForPost, folderPostCount, folders, formatDate, urlForCategory, urlForPost } from '../../lib/posts';
+export async function getStaticPaths() {
+  const posts = await allPosts();
+  return folders(posts).map((folder) => ({ params: { path: folder }, props: { folder } }));
+}
+const { folder } = Astro.props;
+const posts = await allPosts();
+const children = childFolders(posts, folder);
+const directPosts = posts.filter((post) => folderForPost(post) === folder);
+const segments = folder.split('/');
+const name = segments.at(-1);
+const base = import.meta.env.BASE_URL;
+---
+<SiteLayout title={name} description={`${name}分类文章`} posts={posts} activeCategory={segments[0]}>
+  <div class="page-heading">
+    <a href={`${base}posts/`}>文章</a>
+    {segments.slice(0, -1).map((segment, index) => <><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span><a href={urlForCategory(segments.slice(0, index + 1).join('/'), base)}>{segment}</a></>)}
+    <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span><h1>{name}</h1><span class="count-pill">{folderPostCount(posts, folder)}</span>
+  </div>
+  {children.length > 0 && <div class="post-grid category-index">{children.map((child) => <a class="folder-card" href={urlForCategory(child, base)}><span class="material-symbols-outlined" aria-hidden="true">folder</span><strong>{child.split('/').at(-1)}</strong><span class="folder-count">{folderPostCount(posts, child)}</span><span class="material-symbols-outlined folder-arrow" aria-hidden="true">arrow_forward</span></a>)}</div>}
+  {directPosts.length > 0 && <div class="article-list">{directPosts.map((post) => <a class="article-row" href={urlForPost(post, base)}><div><time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time><h2>{post.data.title}</h2><p>{post.data.description}</p></div><span class="material-symbols-outlined" aria-hidden="true">arrow_outward</span></a>)}</div>}
+</SiteLayout>

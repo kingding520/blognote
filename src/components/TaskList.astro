@@ -1,0 +1,17 @@
+---
+import { createMarkdownProcessor, parseFrontmatter } from '@astrojs/markdown-remark';
+
+const files = import.meta.glob<string>('../content/tasks/**/*.md', { query: '?raw', import: 'default', eager: true });
+const renderer = await createMarkdownProcessor();
+const documents = await Promise.all(Object.entries(files).sort(([a], [b]) => a.localeCompare(b, 'zh-CN')).map(async ([path, source]) => {
+  const { frontmatter, content } = parseFrontmatter(source);
+  return {
+    title: typeof frontmatter.title === 'string' ? frontmatter.title : path.split('/').at(-1)?.replace(/\.md$/i, ''),
+    html: (await renderer.render(content)).code,
+  };
+}));
+---
+<section class="task-list rail-label" aria-label="任务清单">
+  <div class="task-list-heading"><span class="material-symbols-outlined" aria-hidden="true">checklist</span><strong>任务清单</strong></div>
+  {documents.length ? documents.map(({ title, html }) => <details class="task-document" open={documents.length === 1}><summary>{title}</summary><div class="task-document-body" set:html={html} /></details>) : <p class="task-list-empty">暂无任务</p>}
+</section>

@@ -1,6 +1,6 @@
 ---
 import SiteLayout from '../../layouts/SiteLayout.astro';
-import { allPosts, formatDate, urlForCategory, urlForPost } from '../../lib/posts';
+import { allPosts, folderForPost, formatDate, urlForCategory, urlForPost } from '../../lib/posts';
 import { render } from 'astro:content';
 export async function getStaticPaths() {
   return (await allPosts()).map((post) => ({ params: { id: post.id }, props: { post } }));
@@ -8,7 +8,9 @@ export async function getStaticPaths() {
 const { post } = Astro.props;
 const posts = await allPosts();
 const { Content, headings } = await render(post);
-const siblings = posts.filter((item) => item.data.category === post.data.category);
+const folder = folderForPost(post);
+const segments = folder.split('/');
+const siblings = posts.filter((item) => folderForPost(item) === folder);
 const index = siblings.findIndex((item) => item.id === post.id);
 const previous = siblings[index + 1];
 const next = siblings[index - 1];
@@ -16,11 +18,11 @@ const base = import.meta.env.BASE_URL;
 ---
 <SiteLayout title={post.data.title} description={post.data.description} posts={posts} activeCategory={post.data.category} toc={headings.filter((heading) => heading.depth <= 3)}>
   <article class="article-page">
-    <div class="breadcrumbs"><a href={`${base}posts/`}>文章</a><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span><a href={urlForCategory(post.data.category, base)}>{post.data.category}</a></div>
+    <div class="breadcrumbs"><a href={`${base}posts/`}>文章</a>{segments.map((segment, index) => <><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span><a href={urlForCategory(segments.slice(0, index + 1).join('/'), base)}>{segment}</a></>)}</div>
     <header class="article-header"><span class="category-tag">{post.data.category}</span><h1>{post.data.title}</h1><p class="article-description">{post.data.description}</p><div class="article-meta"><time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>{post.data.tags.length > 0 && <span>{post.data.tags.join(' · ')}</span>}</div></header>
     <div class="prose"><Content /></div>
     <nav class="post-pager" aria-label="同分类文章导航"><div>{previous && <a href={urlForPost(previous, base)}><small><span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>上一篇</small><strong>{previous.data.title}</strong></a>}</div><div>{next && <a href={urlForPost(next, base)}><small>下一篇<span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span></small><strong>{next.data.title}</strong></a>}</div></nav>
-    <a class="category-back" href={urlForCategory(post.data.category, base)}><span class="material-symbols-outlined" aria-hidden="true">folder</span>{post.data.category}</a>
+    <a class="category-back" href={urlForCategory(folder, base)}><span class="material-symbols-outlined" aria-hidden="true">folder</span>{segments.at(-1)}</a>
   </article>
   <script>
     document.addEventListener('astro:page-load', () => {

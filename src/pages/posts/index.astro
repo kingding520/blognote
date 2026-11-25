@@ -1,13 +1,13 @@
 ---
 import SiteLayout from '../../layouts/SiteLayout.astro';
-import { allPosts, categories, urlForCategory } from '../../lib/posts';
+import { allPosts, childFolders, folderPostCount, urlForCategory } from '../../lib/posts';
 const posts = await allPosts();
-const folders = categories(posts);
+const folders = childFolders(posts);
 const base = import.meta.env.BASE_URL;
 ---
 <SiteLayout title="文章" description="文章分类" posts={posts}>
   <section class="content-section" id="articles">
     <div class="section-heading"><h1>文章</h1><span class="count-pill">{folders.length}</span></div>
-    {folders.length > 0 ? <div class="post-grid category-index">{folders.map((category) => <a class="folder-card" href={urlForCategory(category, base)}><span class="material-symbols-outlined" aria-hidden="true">folder</span><strong>{category}</strong><span class="folder-count">{posts.filter((post) => post.data.category === category).length}</span><span class="material-symbols-outlined folder-arrow" aria-hidden="true">arrow_forward</span></a>)}</div> : <div class="empty-state"><span class="material-symbols-outlined" aria-hidden="true">folder</span><p>暂无内容</p></div>}
+    {folders.length > 0 ? <div class="post-grid category-index">{folders.map((folder) => <a class="folder-card" href={urlForCategory(folder, base)}><span class="material-symbols-outlined" aria-hidden="true">folder</span><strong>{folder}</strong><span class="folder-count">{folderPostCount(posts, folder)}</span><span class="material-symbols-outlined folder-arrow" aria-hidden="true">arrow_forward</span></a>)}</div> : <div class="empty-state"><span class="material-symbols-outlined" aria-hidden="true">folder</span><p>暂无内容</p></div>}
   </section>
 </SiteLayout>

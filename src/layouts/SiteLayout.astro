@@ -2,6 +2,7 @@
 import type { Post } from '../lib/posts';
 import { profile } from '../site.config';
 import ReadingCalendar from '../components/ReadingCalendar.astro';
+import TaskList from '../components/TaskList.astro';
 import { ClientRouter } from 'astro:transitions';
 import '../styles/global.css';
 import '../styles/custom.css';
@@ -81,6 +82,7 @@ const currentPath = Astro.url.pathname;
         <div class="rail-inner">
           <div class="rail-head"><span class="material-symbols-outlined" aria-hidden="true">tune</span><strong class="rail-label">阅读工具</strong></div>
           <ReadingCalendar />
+          <TaskList />
           <div class="right-tools rail-label">
             <div class="progress-header"><span>阅读进度</span><span id="reading-percent">0%</span></div>
             <div class="progress-track" role="progressbar" aria-label="阅读进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="reading-progress"></span></div>

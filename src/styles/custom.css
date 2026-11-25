@@ -11,6 +11,13 @@
   border: 0;
 }
 
+:root:not([data-theme='light']) .post-pager a {
+  background: var(--primary);
+  color: #2b2040;
+}
+
+:root:not([data-theme='light']) .post-pager small { opacity: 1; }
+
 /* 浅色模式：淡紫色的选中项和按钮使用白色文字、图标 */
 :root[data-theme='light'] :is(
   .nav-item.active,
@@ -115,6 +122,20 @@
 .rail-right:focus-within { width: 350px; }
 .rail-right .rail-inner { width: 350px; }
 .reading-calendar { margin: 0 8px 26px; }
+.task-list { margin: 0 8px 26px; }
+.task-list-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 14px; }
+.task-list-heading .material-symbols-outlined { color: var(--primary); }
+.task-list-empty { margin: 0; color: var(--muted); font-size: 12px; }
+.task-document { margin-bottom: 6px; border-radius: 14px; background: var(--surface-high); }
+.task-document summary { padding: 10px 12px; color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; overflow-wrap: anywhere; }
+.task-document-body { max-height: 320px; overflow: auto; padding: 0 12px 10px; color: var(--text); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.task-document-body > :first-child { margin-top: 0; }
+.task-document-body > :last-child { margin-bottom: 0; }
+.task-document-body ul, .task-document-body ol { padding-left: 19px; }
+.task-document-body li { margin: 5px 0; }
+.task-document-body input[type='checkbox'] { accent-color: var(--primary-strong); }
+.task-document-body a { color: var(--primary); text-decoration: underline; }
+.task-document-body pre { overflow: auto; padding: 8px; border-radius: 8px; background: var(--surface); }
 .calendar-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 14px; }
 .calendar-heading .material-symbols-outlined { color: var(--primary); }
 .calendar-auth { display: flex; gap: 8px; }
